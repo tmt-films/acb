@@ -36,7 +36,8 @@ class DataBase:
         self.dataset.insert_one({"_id": user_id,
                                  "name": name,
                                  "username": username,
-                                 "timestamp": time_stamp})
+                                 "timestamp": time_stamp,
+                                 "false_name": None}) # New field added
 
     def update(self, user_id, new_data):
         self.dataset.update_one({"_id": user_id}, {"$set": new_data})

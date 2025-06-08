@@ -88,11 +88,12 @@ class ChatBot:
                 context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING, timeout=1)
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🤴🏻 Gender 👸🏻", callback_data='SetGender')]
+                    [InlineKeyboardButton(text="🤴🏻 Gender 👸🏻", callback_data='SetGender')],
+                    [InlineKeyboardButton(text="📝 Manage False Name", callback_data='ManageFalseName')]
                 ])
 
                 # User info
-                update.message.reply_text(text="🛠Settings", reply_markup=reply_markup) # "Settings" is already English
+                update.message.reply_text(text="🛠Settings", reply_markup=reply_markup)
 
             # if user stop the bot
             except telegram.error.Unauthorized:
@@ -117,8 +118,30 @@ class ChatBot:
         self.chat_pair.update({user_id: partner})
         self.chat_pair.update({partner: user_id})
 
-        context.bot.send_message(chat_id=user_id, text=partner_match(gender1))
-        context.bot.send_message(chat_id=partner, text=partner_match(gender2))
+        # Determine display info for each user
+        user_data = self.record.search(user_id)
+        partner_data = self.record.search(partner)
+
+        user_display_for_partner = partner_data.get('false_name') if partner_data.get('false_name') else gender2
+        partner_display_for_user = user_data.get('false_name') if user_data.get('false_name') else gender1
+
+        # If false_name is not set, use gender (gender1 for user_id, gender2 for partner)
+        # The partner_match function now expects the final display string.
+
+        # For user_id, the partner's display info is partner_display_for_user
+        # For partner, the user_id's display info is user_display_for_partner
+
+        # Correction: The partner_match should display the *other* person's info.
+        # So, for user_id, we display info about 'partner'.
+        # For partner, we display info about 'user_id'.
+
+        # Get partner's false name or gender
+        partner_info_for_user = partner_data.get('false_name') or gender2 # gender2 is partner's actual gender string e.g. "Male"
+        # Get user's false name or gender
+        user_info_for_partner = user_data.get('false_name') or gender1 # gender1 is user's actual gender string e.g. "Female"
+
+        context.bot.send_message(chat_id=user_id, text=partner_match(partner_info_for_user))
+        context.bot.send_message(chat_id=partner, text=partner_match(user_info_for_partner))
 
 
     def find_partner(self, update, context):
@@ -153,7 +176,7 @@ class ChatBot:
                         if partner_gender == "👸🏻 Female":
                             if len(self.girls) >= 1:
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.girls,
-                                                       user_id=user_id, gender1="Female", gender2="Male")
+                                                       user_id=user_id, gender1="Male", gender2="Female")
                             elif len(self.boys) >= 2:
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.boys,
                                                        user_id=user_id, gender1="Male", gender2="Male")
@@ -178,7 +201,7 @@ class ChatBot:
                         if partner_gender == "🤴🏻 Male":
                             if len(self.boys) >= 1:
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.boys,
-                                                       user_id=user_id, gender1="Male", gender2="Female")
+                                                       user_id=user_id, gender1="Female", gender2="Male")
                             elif len(self.girls) >= 2:
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.girls,
                                                        user_id=user_id, gender1="Female", gender2="Female")
@@ -296,7 +319,7 @@ class ChatBot:
         chat_type = update.callback_query.message.chat.type
 
         if chat_type == "private":
-            data = self.record.search(user_id) # Fetch once
+            data = self.record.search(user_id)
 
             if "SetGender" in query.data:
                 if user_id in self.boys: self.boys.remove(user_id)
@@ -311,6 +334,10 @@ class ChatBot:
                 query.edit_message_text(
                     text=f"Edit your gender or your partner's gender\nYou: {my_gender}\nPartner: {partner_gender}",
                     reply_markup=reply_markup)
+
+            elif "ManageFalseName" in query.data:
+                current_false_name = data.get('false_name')
+                query.edit_message_text(text=manage_false_name_prompt(current_false_name), parse_mode='Markdown')
 
             elif "SetMine" in query.data:
                 my_gender = data.get("gender")
@@ -333,17 +360,16 @@ class ChatBot:
                 new_db_data = {}
                 if "SetBoy" in query.data:
                     gender_val = "🤴🏻 Male"
-                else: # SetGirl
+                else:
                     gender_val = "👸🏻 Female"
 
                 if str(query.data).split("_")[1] == "M":
                     new_db_data = {"gender": gender_val}
-                else: # Partner
+                else:
                     new_db_data = {"partner_gender": gender_val}
 
                 self.record.update(user_id, new_db_data)
 
-                # Refresh data after update to show current state
                 updated_data = self.record.search(user_id)
                 my_gender = updated_data.get("gender")
                 partner_gender = updated_data.get("partner_gender")
@@ -378,42 +404,59 @@ class ChatBot:
     def broadcast_message(self, update, context):
         issuer_id = update.message.from_user.id
 
-        # 1. Admin Check
         if issuer_id not in ADMIN_USER_IDS:
             context.bot.send_message(chat_id=issuer_id, text=broadcast_access_denied())
             return
 
-        # 2. Message Extraction
         message_to_broadcast = " ".join(context.args)
         if not message_to_broadcast:
             context.bot.send_message(chat_id=issuer_id, text=broadcast_no_message())
             return
 
-        # 3. Fetch Users
         all_user_ids = self.record.get_all_user_ids()
         if not all_user_ids:
             context.bot.send_message(chat_id=issuer_id, text="No users found to broadcast to.")
             return
 
-        # 4. Send Loop & Counters
         success_count = 0
         failure_count = 0
-        for user_id in all_user_ids:
-            if user_id == issuer_id: # Optional: Skip sending to self
+        for user_id_target in all_user_ids: # Renamed user_id to user_id_target to avoid conflict
+            if user_id_target == issuer_id:
                 continue
             try:
-                context.bot.send_message(chat_id=user_id, text=message_to_broadcast)
+                context.bot.send_message(chat_id=user_id_target, text=message_to_broadcast)
                 success_count += 1
-                time.sleep(0.1) # To avoid hitting rate limits
+                time.sleep(0.1)
             except (telegram.error.Unauthorized, telegram.error.BadRequest) as e:
                 failure_count += 1
-                print(f"Failed to send broadcast to {user_id}: {e}") # Server-side log
+                print(f"Failed to send broadcast to {user_id_target}: {e}")
             except Exception as e:
                 failure_count += 1
-                print(f"Unexpected error sending broadcast to {user_id}: {e}") # Server-side log
+                print(f"Unexpected error sending broadcast to {user_id_target}: {e}")
 
-        # 5. Send Summary
         context.bot.send_message(chat_id=issuer_id, text=broadcast_summary(success_count, failure_count))
+
+    def set_false_name(self, update, context):
+        user_id = update.message.from_user.id
+        name_parts = context.args
+        if not name_parts:
+            context.bot.send_message(chat_id=user_id, text=set_false_name_usage())
+            return
+
+        false_name_to_set = " ".join(name_parts)
+        self.record.update(user_id, {"false_name": false_name_to_set})
+        context.bot.send_message(chat_id=user_id, text=false_name_set(false_name_to_set))
+
+    def clear_false_name(self, update, context):
+        user_id = update.message.from_user.id
+        self.record.update(user_id, {"false_name": None})
+        context.bot.send_message(chat_id=user_id, text=false_name_cleared())
+
+    def manage_false_name_command(self, update, context):
+        user_id = update.message.from_user.id
+        data = self.record.search(user_id)
+        current_false_name = data.get('false_name')
+        context.bot.send_message(chat_id=user_id, text=manage_false_name_prompt(current_false_name), parse_mode='Markdown')
 
     def command_handler(self):
         updater = Updater(self.bot_key, use_context=True)
@@ -425,8 +468,11 @@ class ChatBot:
         dp.add_handler(CommandHandler("next", self.find_partner, run_async=True))
         dp.add_handler(CommandHandler("stop", self.end_conversation, run_async=True))
         dp.add_handler(CommandHandler("sharelink", self.sharelink, run_async=True))
-        # Add broadcast command handler here
         dp.add_handler(CommandHandler("broadcast", self.broadcast_message, run_async=True))
+        # Add false name command handlers here
+        dp.add_handler(CommandHandler("myname", self.manage_false_name_command, run_async=True))
+        dp.add_handler(CommandHandler("setname", self.set_false_name, run_async=True))
+        dp.add_handler(CommandHandler("clearname", self.clear_false_name, run_async=True))
 
         dp.add_handler(MessageHandler(Filters.all, self.media_handler, run_async=True))
         dp.add_handler(CallbackQueryHandler(self.button_handler, run_async=True))

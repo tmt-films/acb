@@ -21,20 +21,12 @@ Commands
 /stop — stop the dialog
 /sharelink - share profile with partner
 /settings - settings menu
-"""
+/myname - manage your false name
+""" # Added /myname to help
 
-
-def partner_match(gender):
-    if gender == "Male":  # Updated to expect "Male"
-        partner_display = "🤴🏻 Male"
-    elif gender == "Female":  # Updated to expect "Female"
-        partner_display = "👸🏻 Female"
-    else:
-        partner_display = gender # Fallback if gender is not Male/Female
-
-    return f"""Partner: {partner_display}
-/next — find a new partner
-/stop — stop this chat"""
+# Modified partner_match function
+def partner_match(display_info):
+    return f"You are now chatting with {display_info}.\nType /next to find a new partner or /stop to end this chat."
 
 
 def partner_not_found():
@@ -71,3 +63,29 @@ def broadcast_no_message():
 
 def broadcast_summary(success_count, failure_count):
     return f"Broadcast attempt finished.\nSuccessfully sent to: {success_count} users.\nFailed to send to: {failure_count} users."
+
+
+# New functions for false name management
+def manage_false_name_prompt(current_false_name):
+    if not current_false_name: # Handles None or empty string
+        display_name = "Not set"
+    else:
+        display_name = current_false_name
+
+    return (f"Your current false name is: {display_name}\n\n"
+            "You can set or change your false name using:\n"
+            "/setname <your_desired_name>\n\n"
+            "To remove your false name, use:\n"
+            "/clearname")
+
+
+def set_false_name_usage():
+    return "Usage: /setname <your desired name>"
+
+
+def false_name_set(name):
+    return f"Your false name has been set to: {name}"
+
+
+def false_name_cleared():
+    return "Your false name has been cleared."
