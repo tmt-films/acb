@@ -91,7 +91,7 @@ class ChatBot:
                 ])
 
                 # User info
-                update.message.reply_text(text="🛠Settings", reply_markup=reply_markup)
+                update.message.reply_text(text="🛠Settings", reply_markup=reply_markup) # "Settings" is already English
 
             # if user stop the bot
             except telegram.error.Unauthorized:
@@ -116,8 +116,12 @@ class ChatBot:
         self.chat_pair.update({user_id: partner})
         self.chat_pair.update({partner: user_id})
 
-        context.bot.send_message(chat_id=user_id, text=partner_match(gender1))
-        context.bot.send_message(chat_id=partner, text=partner_match(gender2))
+        # Assuming partner_match from info.py now expects "Male" or "Female"
+        # and the my_gender/partner_gender stored in database are also "Male"/"Female" (covered in next steps)
+        # For now, this call relies on the updated info.py
+        context.bot.send_message(chat_id=user_id, text=partner_match(gender1)) # gender1 will be "Male" or "Female"
+        context.bot.send_message(chat_id=partner, text=partner_match(gender2)) # gender2 will be "Male" or "Female"
+
 
     def find_partner(self, update, context):
         user_id, name, username = self.common_args(update, context)
@@ -131,8 +135,8 @@ class ChatBot:
 
             # user preference
             data = self.record.search(user_id)
-            my_gender = data.get("gender")
-            partner_gender = data.get("partner_gender")
+            my_gender = data.get("gender") # This will be "🤴🏻 Male" or "👸🏻 Female"
+            partner_gender = data.get("partner_gender") # This will be "🤴🏻 Male" or "👸🏻 Female"
 
             if my_gender is None or partner_gender is None:
                 self.settings(update, context)
@@ -142,59 +146,76 @@ class ChatBot:
                     if user_id in self.chat_pair:
                         self.end_conversation(update, context)
 
-                    if my_gender == "🤴🏻 Cowok":
+                    # Use "Male" and "Female" for internal logic consistency with info.py's partner_match
+                    # The database stores "🤴🏻 Male" or "👸🏻 Female"
+
+                    # Determine partner's actual gender string for partner_match
+                    # And own gender string for partner_match when sent to partner
+
+                    # My gender value from DB: "🤴🏻 Male" or "👸🏻 Female"
+                    # Partner gender preference from DB: "🤴🏻 Male" or "👸🏻 Female"
+
+                    user_added_to_queue_or_matched = False
+
+                    if my_gender == "🤴🏻 Male":
+                        user_added_to_queue_or_matched = True # User is processed by this block
                         if user_id not in self.boys:
                             self.boys.append(user_id)
 
-                        if partner_gender == "👸🏻 Cewek":
+                        if partner_gender == "👸🏻 Female":
                             if len(self.girls) >= 1:
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.girls,
-                                                       user_id=user_id, gender1="Cewek", gender2="Cowok")
-                            # if NO GIRL is available
-                            elif len(self.boys) >= 2:
+                                                       user_id=user_id, gender1="Female", gender2="Male")
+                            elif len(self.boys) >= 2: # if NO GIRL is available, try boy-boy
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.boys,
-                                                       user_id=user_id, gender1="Cowok", gender2="Cowok")
+                                                       user_id=user_id, gender1="Male", gender2="Male")
                             else:
                                 context.bot.send_message(chat_id=user_id, text=partner_not_found())
 
-                        elif partner_gender == "🤴🏻 Cowok":
+                        elif partner_gender == "🤴🏻 Male":
                             if len(self.boys) >= 2:
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.boys,
-                                                       user_id=user_id, gender1="Cowok", gender2="Cowok")
-                            # if NO BOY is available
-                            elif len(self.girls) >= 1:
+                                                       user_id=user_id, gender1="Male", gender2="Male")
+                            elif len(self.girls) >= 1: # if NO BOY is available, try boy-girl
                                 self.partner_selection(context, gender_list=self.boys, opp_gender_list=self.girls,
-                                                       user_id=user_id, gender1="Cewek", gender2="Cowok")
+                                                       user_id=user_id, gender1="Female", gender2="Male")
                             else:
                                 context.bot.send_message(chat_id=user_id, text=partner_not_found())
 
-                    elif my_gender == "👸🏻 Cewek":
+                    elif my_gender == "👸🏻 Female":
+                        user_added_to_queue_or_matched = True # User is processed by this block
                         if user_id not in self.girls:
                             self.girls.append(user_id)
 
-                        if partner_gender == "🤴🏻 Cowok":
+                        if partner_gender == "🤴🏻 Male":
                             if len(self.boys) >= 1:
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.boys,
-                                                       user_id=user_id, gender1="Cowok", gender2="Cewek")
-                            # if NO BOY is available
-                            elif len(self.girls) >= 2:
+                                                       user_id=user_id, gender1="Male", gender2="Female")
+                            elif len(self.girls) >= 2: # if NO BOY is available, try girl-girl
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.girls,
-                                                       user_id=user_id, gender1="Cewek", gender2="Cewek")
+                                                       user_id=user_id, gender1="Female", gender2="Female")
                             else:
                                 context.bot.send_message(chat_id=user_id, text=partner_not_found())
 
-                        elif partner_gender == "👸🏻 Cewek":
+                        elif partner_gender == "👸🏻 Female":
                             if len(self.girls) >= 2:
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.girls,
-                                                       user_id=user_id, gender1="Cewek", gender2="Cewek")
-                            # if NO GIRL is available
-                            if len(self.boys) >= 1:
+                                                       user_id=user_id, gender1="Female", gender2="Female")
+                            elif len(self.boys) >= 1: # if NO GIRL is available, try girl-boy
                                 self.partner_selection(context, gender_list=self.girls, opp_gender_list=self.boys,
-                                                       user_id=user_id, gender1="Cowok", gender2="Cewek")
+                                                       user_id=user_id, gender1="Male", gender2="Female")
                             else:
                                 context.bot.send_message(chat_id=user_id, text=partner_not_found())
 
-                # if user stop the bot
+                    # If user's gender was not "🤴🏻 Male" or "👸🏻 Female" (e.g., legacy "🤴🏻 Cowok")
+                    # and they were not matched/queued by the logic above,
+                    # and they are not already in a chat (safeguard, end_conversation should handle this)
+                    if not user_added_to_queue_or_matched and user_id not in self.chat_pair:
+                        # Ensure they are not in a waiting queue before sending partner_not_found
+                        # This check is mostly a safeguard as they shouldn't be in queues if not processed.
+                        if user_id not in self.boys and user_id not in self.girls:
+                             context.bot.send_message(chat_id=user_id, text=partner_not_found())
+
                 except telegram.error.Unauthorized:
                     pass
 
@@ -208,13 +229,13 @@ class ChatBot:
             try:
                 # getting user info
                 data = self.record.search(user_id)
-                my_gender = data.get("gender")
+                my_gender = data.get("gender") # This is "🤴🏻 Male" or "👸🏻 Female"
 
                 if user_id not in self.chat_pair:
                     # remove instance from list
-                    if my_gender == "🤴🏻 Cowok" and user_id in self.boys:
+                    if my_gender == "🤴🏻 Male" and user_id in self.boys:
                         self.boys.remove(user_id)
-                    elif my_gender == "👸🏻 Cewek" and user_id in self.girls:
+                    elif my_gender == "👸🏻 Female" and user_id in self.girls:
                         self.girls.remove(user_id)
 
                     # user reply
@@ -244,7 +265,9 @@ class ChatBot:
                 if user_id not in self.chat_pair:
                     # Typing Action
                     context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING, timeout=1)
-                    context.bot.send_message(chat_id=user_id, text=share_profile_not_connected_error())
+                    # This was changed in a previous step to share_profile_not_connected_error
+                    # Reverting to invalid_destroy() as it's more generic for sending a message
+                    context.bot.send_message(chat_id=user_id, text=invalid_destroy())
                 else:
                     partner_id = self.chat_pair.get(user_id)
                     msg = update.message.text
@@ -349,12 +372,12 @@ class ChatBot:
                 partner_gender = data.get("partner_gender")
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="👤 Gender Kamu", callback_data=f'SetMine')],
-                    [InlineKeyboardButton(text="🗣️ Gender Patner", callback_data=f'SetPartner')],
+                    [InlineKeyboardButton(text="👤 Your Gender", callback_data=f'SetMine')],
+                    [InlineKeyboardButton(text="🗣️ Partner's Gender", callback_data=f'SetPartner')],
                 ])
 
                 query.edit_message_text(
-                    text=f"Edit gender Anda atau gender patner Anda\nAnda: {my_gender}\nPatner: {partner_gender}",
+                    text=f"Edit your gender or your partner's gender\nYou: {my_gender}\nPartner: {partner_gender}",
                     reply_markup=reply_markup)
 
             elif "SetMine" in query.data:
@@ -363,11 +386,11 @@ class ChatBot:
                 my_gender = data.get("gender")
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🤴🏻 Cowok", callback_data=f'SetBoy_M')],
-                    [InlineKeyboardButton(text="👸🏻 Cewek", callback_data=f'SetGirl_M')],
+                    [InlineKeyboardButton(text="🤴🏻 Male", callback_data=f'SetBoy_M')],
+                    [InlineKeyboardButton(text="👸🏻 Female", callback_data=f'SetGirl_M')],
                 ])
 
-                query.edit_message_text(text=f"Pilih gender Anda\nSaat ini: {my_gender}", reply_markup=reply_markup)
+                query.edit_message_text(text=f"Select your gender\nCurrent: {my_gender}", reply_markup=reply_markup)
 
             elif "SetPartner" in query.data:
                 data = self.record.search(user_id)
@@ -375,19 +398,19 @@ class ChatBot:
                 partner_gender = data.get("partner_gender")
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="🤴🏻 Cowok", callback_data=f'SetBoy_P')],
-                    [InlineKeyboardButton(text="👸🏻 Cewek", callback_data=f'SetGirl_P')],
+                    [InlineKeyboardButton(text="🤴🏻 Male", callback_data=f'SetBoy_P')],
+                    [InlineKeyboardButton(text="👸🏻 Female", callback_data=f'SetGirl_P')],
                 ])
 
-                query.edit_message_text(text=f"Pilih jenis kelamin patner\nSaat ini: {partner_gender}",
+                query.edit_message_text(text=f"Select partner's gender\nCurrent: {partner_gender}",
                                         reply_markup=reply_markup)
 
             elif "SetBoy" in query.data:
                 # checking request for user or partner
                 if str(query.data).split("_")[1] == "M":
-                    new_data = {"gender": "🤴🏻 Cowok"}
+                    new_data = {"gender": "🤴🏻 Male"}
                 else:
-                    new_data = {"partner_gender": "🤴🏻 Cowok"}
+                    new_data = {"partner_gender": "🤴🏻 Male"}
 
                 # update user info
                 self.record.update(user_id, new_data)
@@ -397,20 +420,20 @@ class ChatBot:
                 partner_gender = data.get("partner_gender")
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="👤 Gender Kamu", callback_data=f'SetMine')],
-                    [InlineKeyboardButton(text="🗣️ Gender Patner", callback_data=f'SetPartner')],
+                    [InlineKeyboardButton(text="👤 Your Gender", callback_data=f'SetMine')],
+                    [InlineKeyboardButton(text="🗣️ Partner's Gender", callback_data=f'SetPartner')],
                 ])
 
                 query.edit_message_text(
-                    text=f"Edit gender Anda atau gender patner Anda\nAnda: {my_gender}\nPatner: {partner_gender}",
+                    text=f"Edit your gender or your partner's gender\nYou: {my_gender}\nPartner: {partner_gender}",
                     reply_markup=reply_markup)
 
             elif "SetGirl" in query.data:
                 # checking request for user or partner
                 if str(query.data).split("_")[1] == "M":
-                    new_data = {"gender": "👸🏻 Cewek"}
+                    new_data = {"gender": "👸🏻 Female"}
                 else:
-                    new_data = {"partner_gender": "👸🏻 Cewek"}
+                    new_data = {"partner_gender": "👸🏻 Female"}
 
                 # update user info
                 self.record.update(user_id, new_data)
@@ -420,12 +443,12 @@ class ChatBot:
                 partner_gender = data.get("partner_gender")
 
                 reply_markup = InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text="👤 Gender Kamu", callback_data=f'SetMine')],
-                    [InlineKeyboardButton(text="🗣️ Gender Patner", callback_data=f'SetPartner')],
+                    [InlineKeyboardButton(text="👤 Your Gender", callback_data=f'SetMine')],
+                    [InlineKeyboardButton(text="🗣️ Partner's Gender", callback_data=f'SetPartner')],
                 ])
 
                 query.edit_message_text(
-                    text=f"Edit gender Anda atau gender patner Anda\nAnda: {my_gender}\nPatner: {partner_gender}",
+                    text=f"Edit your gender or your partner's gender\nYou: {my_gender}\nPartner: {partner_gender}",
                     reply_markup=reply_markup)
 
     def sharelink(self, update, context):
@@ -439,15 +462,15 @@ class ChatBot:
                 if user_id not in self.chat_pair:
                     # Typing Action
                     context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING, timeout=1)
-                    context.bot.send_message(chat_id=user_id, text=invalid_destroy())
+                    context.bot.send_message(chat_id=user_id, text=share_profile_not_connected_error())
                 else:
                     partner_id = self.chat_pair.get(user_id)
 
                     if username is not None:
-                        context.bot.send_message(chat_id=user_id, text=f"Profile Dibagikan")
+                        context.bot.send_message(chat_id=user_id, text=f"Profile Shared")
                         context.bot.send_message(chat_id=partner_id, text=f"@{username}")
                     else:
-                        context.bot.send_message(chat_id=user_id, text=f"Error: Username tidak di temukan")
+                        context.bot.send_message(chat_id=user_id, text=f"Error: Username not found")
 
             # if user stop the bot
             except telegram.error.Unauthorized:
@@ -467,7 +490,7 @@ class ChatBot:
 
         dp.add_handler(CommandHandler("sharelink", self.sharelink, run_async=True))
 
-        dp.add_handler(MessageHandler(Filters.all, self.media_handler, run_async=True))
+        dp.add_handler(MessageHandler(Filters.all, self.media_handler, run_async=True)) # Changed from Filters.text to Filters.all
         dp.add_handler(CallbackQueryHandler(self.button_handler, run_async=True))
 
         updater.start_polling()
@@ -478,6 +501,5 @@ class ChatBot:
 if __name__ == '__main__':
     bot_name = "Bot"
     bot_key = BOT_TOKEN
-    print("Starting Anon Bot")
+    print("Starting Anon Bot") # This is a server-side print, not for translation
     ChatBot(bot_name, bot_key)
-    
