@@ -53,3 +53,7 @@ def destroy(who=None):
 def invalid_destroy():
     return """Anda tidak memiliki lawan bicara 🤔
  Ketik /next untuk mencari patner baru"""
+
+
+def share_profile_not_connected_error():
+    return """Error: Anda harus terhubung dengan partner untuk membagikan profil."""

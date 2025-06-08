@@ -244,7 +244,7 @@ class ChatBot:
                 if user_id not in self.chat_pair:
                     # Typing Action
                     context.bot.send_chat_action(chat_id=user_id, action=ChatAction.TYPING, timeout=1)
-                    context.bot.send_message(chat_id=user_id, text=invalid_destroy())
+                    context.bot.send_message(chat_id=user_id, text=share_profile_not_connected_error())
                 else:
                     partner_id = self.chat_pair.get(user_id)
                     msg = update.message.text
