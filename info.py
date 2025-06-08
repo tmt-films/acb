@@ -59,3 +59,15 @@ Type /next to find a new partner"""
 
 def share_profile_not_connected_error():
     return """Error: You must be connected to a partner to share your profile."""
+
+
+def broadcast_access_denied():
+    return "Sorry, you are not authorized to use this command."
+
+
+def broadcast_no_message():
+    return "Please provide a message to broadcast. Usage: /broadcast <your message>"
+
+
+def broadcast_summary(success_count, failure_count):
+    return f"Broadcast attempt finished.\nSuccessfully sent to: {success_count} users.\nFailed to send to: {failure_count} users."

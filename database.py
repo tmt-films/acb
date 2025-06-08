@@ -40,3 +40,12 @@ class DataBase:
 
     def update(self, user_id, new_data):
         self.dataset.update_one({"_id": user_id}, {"$set": new_data})
+
+    def get_all_user_ids(self):
+        """
+        Retrieves a list of all user IDs from the database.
+        """
+        # Find all documents, projecting only the _id field for efficiency
+        cursor = self.dataset.find({}, {'_id': 1})
+        # Extract the _id from each document and return as a list
+        return [doc['_id'] for doc in cursor]
